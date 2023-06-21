@@ -1,0 +1,129 @@
+service: serverless
+frameworkVersion: "3"
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  httpApi:
+    authorizers:
+      customAuthorizer:
+        type: request
+        functionName: verifyToken
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - "sqs:*"
+            - "events:*"
+            - "ses:*"
+            - "dynamodb:*"
+          Resource: "*"
+
+functions:
+  eventBridgeCheck:
+    handler: src/eventBridgeCheck.handler
+    events:
+      - eventBridge:
+          schedule: rate(10 minutes)
+    environment:
+      QUEUE_URL: ${construct:jobs.queueUrl}
+  getAllUserLinks:
+    handler: src/getAllUserLinks.handler
+    events:
+      - httpApi:
+          path: /getAllLinks
+          method: get
+          authorizer:
+            name: customAuthorizer
+  linkRedirect:
+    handler: src/linkRedirect.handler
+    events:
+      - httpApi:
+          path: /redirect/{id}
+          method: get
+    environment:
+      QUEUE_URL: ${construct:jobs.queueUrl}
+  linkshorter:
+    handler: src/linkShorter.handler
+    events:
+      - httpApi:
+          path: /linkShorter
+          method: post
+          authorizer:
+            name: customAuthorizer
+  deleteLink:
+    handler: src/deleteLink.handler
+    events:
+      - httpApi:
+          path: /delete/{id}
+          method: post
+          authorizer:
+            name: customAuthorizer
+  verifyToken:
+    handler: src/tokenValidation.handler
+  addUser:
+    handler: src/addUser.handler
+    events:
+      - httpApi:
+          path: /register
+          method: post
+  generateTokens:
+    handler: src/generateTokens.handler
+    events:
+      - httpApi:
+          path: /auth
+          method: post
+  refreshToken:
+    handler: src/refreshToken.handler
+    events:
+      - httpApi:
+          path: /refresh
+          method: post
+
+
+constructs:
+    jobs:
+        type: queue
+        worker:
+            handler: src/worker.handler
+        batchSize: 10
+
+resources:
+  Resources:
+    UserTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: UserTable
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: userEmail
+            AttributeType: S
+        KeySchema:
+          - AttributeName: userEmail
+            KeyType: HASH
+    UserTableTokens:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: UserTableTokens
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: userEmail
+            AttributeType: S
+        KeySchema:
+          - AttributeName: userEmail
+            KeyType: HASH
+    ShortLinksTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ShortLinksTable
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+
+plugins:
+  - serverless-lift

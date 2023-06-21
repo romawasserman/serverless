@@ -1,0 +1,422 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "version": "1.0",
+    "title": "serverless",
+    "summary": "serverless",
+    "description": "Serverless solution to create short links  ",
+    "contact": {
+      "name": "Roma",
+      "url": "kek.com",
+      "email": "romawasserman@gmail.com"
+    },
+    "license": {
+      "name": "Apache-2.0",
+      "identifier": "Apache-2.0"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://duoosrfwzl.execute-api.us-east-1.amazonaws.com",
+      "description": ""
+    }
+  ],
+  "paths": {
+    "/register": {
+      "post": {
+        "summary": "",
+        "description": "Register user with email and password",
+        "operationId": "post-register",
+        "requestBody": {
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userEmail": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "userEmail",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "userEmail": {
+                      "type": "string"
+                    },
+                    "password": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "userEmail",
+                    "password"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "servers": [
+          {
+            "url": "https://duoosrfwzl.execute-api.us-east-1.amazonaws.com",
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/auth": {
+      "post": {
+        "summary": "",
+        "description": "Get access and refresh token for registered user",
+        "operationId": "post-auth",
+        "requestBody": {
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userEmail": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "userEmail",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    },
+                    "refreshToken": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers": [
+          {
+            "url": "https://duoosrfwzl.execute-api.us-east-1.amazonaws.com",
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/refresh": {
+      "post": {
+        "summary": "",
+        "description": "refresh access token with refresh token",
+        "operationId": "post-refresh",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "refreshToken": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "refreshToken"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "refreshToken": {
+                      "type": "string"
+                    },
+                    "accessToken": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers": [
+          {
+            "url": "https://duoosrfwzl.execute-api.us-east-1.amazonaws.com",
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/linkShorter": {
+      "post": {
+        "summary": "",
+        "description": "Create short link from orginal url",
+        "operationId": "post-linkShorter",
+        "parameters": [
+          {
+            "name": "accessToken",
+            "in": "header",
+            "description": "Access token that you get when authentication is completed",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "originalUrl": {
+                    "type": "string"
+                  },
+                  "expiration": {
+                    "type": "string",
+                    "description": "Select how long link will remain active. Possible options are: 'onclick' - will be deactivated after first click, '1','3','7' - number of days it will we active"
+                  }
+                },
+                "required": [
+                  "originalUrl",
+                  "expiration"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "shortLink": {
+                      "type": "string"
+                    },
+                    "dbItem": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "expirationTime": {
+                          "type": "string"
+                        },
+                        "originalUrl": {
+                          "type": "string"
+                        },
+                        "clicked": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers": [
+          {
+            "url": "https://duoosrfwzl.execute-api.us-east-1.amazonaws.com",
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/delete/{id}": {
+      "post": {
+        "summary": "",
+        "description": "delete link by id ",
+        "operationId": "post-delete-id",
+        "parameters": [
+          {
+            "name": "accessToken",
+            "in": "header",
+            "description": "AccessToken you get on auth",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "id of shortLink ",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {}
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "servers": [
+          {
+            "url": "https://duoosrfwzl.execute-api.us-east-1.amazonaws.com",
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/getAllLinks": {
+      "get": {
+        "summary": "Your GET endpoint",
+        "description": "Get all shortLinks info created by particular user",
+        "operationId": "get-getAllLinks",
+        "parameters": [
+          {
+            "name": "accessToken",
+            "in": "header",
+            "description": "Auth token",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "expirationTime": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "originalUrl": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "email": {
+                        "type": "string"
+                      },
+                      "clicked": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "x-examples": {
+                    "Example 1": [
+                      {
+                        "expirationTime": "onclick",
+                        "originalUrl": "https://github.com/",
+                        "id": "69aba3",
+                        "email": "romawasserman@gmail.com",
+                        "clicked": 0
+                      },
+                      {
+                        "expirationTime": 1687940402,
+                        "originalUrl": "https://github.com/",
+                        "email": "romawasserman@gmail.com",
+                        "id": "2a010a",
+                        "clicked": 1
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers": [
+          {
+            "url": "https://duoosrfwzl.execute-api.us-east-1.amazonaws.com",
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/redirect/{id}": {
+      "get": {
+        "summary": "Your GET endpoint",
+        "description": "Redirect user to originalUrl path",
+        "operationId": "get-redirect-id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "id of shortUrl",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Found"
+          }
+        },
+        "servers": [
+          {
+            "url": "https://duoosrfwzl.execute-api.us-east-1.amazonaws.com",
+            "description": ""
+          }
+        ]
+      }
+    }
+  }
+}
