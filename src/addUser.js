@@ -1,35 +1,27 @@
-const AWS = require('aws-sdk');
+const bcrypt = require("bcryptjs")
+
+const { customResponse } = require("./helpers/response.js")
+const { customError } = require("./helpers/errors.js")
+const { addToDb } = require("./database/dbHelpers.js")
 
 const addUser = async (event) => {
-  const dynamodb = new AWS.DynamoDB.DocumentClient();
-
-  const { userEmail, password } = JSON.parse(event.body);
+  const { userEmail, password } = JSON.parse(event.body)
+  const hashedPassword = await bcrypt.hash(password, 10)
 
   const newUser = {
     userEmail,
-    password,
-  };
+    password: hashedPassword,
+  }
 
   try {
-    await dynamodb.put({
-      TableName: 'UserTable',
-      Item: newUser,
-    }).promise();
-
-    return {
-      statusCode: 200,
-      body: JSON.stringify(newUser),
-    };
+    await addToDb("UserTable", newUser) // process.env.USER_TABLE ?
+    return customResponse(200, { userEmail, password })
   } catch (error) {
-    console.log(error);
-
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Failed to add user' }),
-    };
+    console.log(error)
+    return customError(500, "cannot create user")
   }
-};
+}
 
 module.exports = {
   handler: addUser,
-};
+}

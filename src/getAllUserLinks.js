@@ -1,32 +1,28 @@
-const AWS = require('aws-sdk');
+const { scanItemsDb } = require("./database/dbHelpers")
+const { defaultError } = require("./helpers/errors")
+const { customResponse } = require("./helpers/response")
 
-
-module.exports.handler = async (event) => {
-  const dynamodb = new AWS.DynamoDB.DocumentClient();
+const getAllLinks = async (event) => {
   const { email } = event.requestContext.authorizer.lambda
   try {
-    const params = {
-      TableName: "ShortLinksTable",
-      FilterExpression: "#email = :email",
-      ExpressionAttributeNames: {
+    const result = await scanItemsDb(
+      "ShortLinksTable",
+      "#email = :email",
+      {
         "#email": "email",
       },
-      ExpressionAttributeValues: {
-        ":email": email
+      {
+        ":email": email,
       }
-    };
-    const result = await dynamodb.scan(params).promise();
-    const { Items } = result;
+    )
+    const { Items } = result
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify(Items),
-    };
+    return customResponse(200, Items)
   } catch (error) {
-    console.error(error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: 'Internal Server Error' }),
-    };
+    console.error(error)
+    return defaultError()
   }
-};
+}
+module.exports = {
+  handler: getAllLinks,
+}

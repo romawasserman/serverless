@@ -1,56 +1,38 @@
-const AWS = require("aws-sdk")
+const {
+  getFromDb,
+  updateClicks,
+  deleteFromDb,
+} = require("./database/dbHelpers")
+const { customError } = require("./helpers/errors")
+const { sendSQSMessage } = require("./helpers/sqsHelper")
 
-module.exports.handler = async (event) => {
-  const dynamodb = new AWS.DynamoDB.DocumentClient()
+const linkRedirect = async (event) => {
   try {
     const { id } = event.pathParameters
 
-    const params = {
-      TableName: "ShortLinksTable",
-      Key: { id },
-    }
-    const result = await dynamodb.get(params).promise()
+    const result = await getFromDb("ShortLinksTable", { id: id })
     const { Item } = result
 
-    if (
-      Item &&
-      (Item.expirationTime === "onclick" ||
-        Item.expirationTime > Math.floor(Date.now() / 1000))
-    ) {
-      if (Item.expirationTime === "onclick") {
-        await dynamodb.delete(params).promise()
-        const sqs = new AWS.SQS()
-        await sqs
-          .sendMessage({
-            QueueUrl: process.env.QUEUE_URL,
+    if (Item && Item.expirationTime === "onclick") {
+      await deleteFromDb("ShortLinksTable", { id: id })
+      await sendSQSMessage(process.env.QUEUE_URL, id, Item)
 
-            MessageBody: JSON.stringify({
-              email: Item.email,
-              msg: `Your link ${id}, that refers to ${Item.originalUrl} is deleted`,
-              subject: `Link deactivation`
-            }),
-          })
-          .promise()
-          return {
-            statusCode: 302,
-            headers: {
-              Location: Item.originalUrl,
-            },
-          }
-      } else {
-        const updateParams = {
-          TableName: "ShortLinksTable",
-          Key: { id },
-          UpdateExpression: "SET #clicked = #clicked + :increment",
-          ExpressionAttributeNames: {
-            "#clicked": "clicked",
-          },
-          ExpressionAttributeValues: {
-            ":increment": 1,
-          },
-        }
-        await dynamodb.update(updateParams).promise()
+      return {
+        statusCode: 302,
+        headers: {
+          Location: Item.originalUrl,
+        },
       }
+    } else {
+      await updateClicks(
+        "ShortLinksTable",
+        { id: id },
+        "SET #clicked = #clicked + :increment",
+        {
+          ":increment": 1,
+        }
+      )
+
       return {
         statusCode: 302,
         headers: {
@@ -58,16 +40,11 @@ module.exports.handler = async (event) => {
         },
       }
     }
-
-    return {
-      statusCode: 404,
-      body: JSON.stringify({ message: "Short link not found or expired" }),
-    }
   } catch (error) {
     console.error(error)
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: "Internal Server Error" }),
-    }
+    return customError(500, "Internal Server Error")
   }
+}
+module.exports = {
+  handler: linkRedirect,
 }

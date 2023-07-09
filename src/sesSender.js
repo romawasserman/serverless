@@ -1,7 +1,7 @@
 const AWS = require('aws-sdk');
 const ses = new AWS.SES();
 
-exports.handler = function (event, context) {
+const sesSender = function (event, context) {
   for (const message of event.Records) {
     const bodyData = JSON.parse(message.body);
 
@@ -19,7 +19,7 @@ exports.handler = function (event, context) {
         },
         Subject: { Data: subject }, 
       },
-      Source: 'rpoma2154@gmail.com', 
+      Source: process.env.EMAIL, 
     };
 
     ses.sendEmail(params, function (err, data) {
@@ -31,3 +31,7 @@ exports.handler = function (event, context) {
     });
   }
 };
+module.exports = {
+  handler: sesSender,
+}
+

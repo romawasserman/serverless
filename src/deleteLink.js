@@ -1,36 +1,27 @@
-const AWS = require('aws-sdk');
+const { getFromDb, deleteFromDb } = require("./database/dbHelpers")
+const { customError, defaultError } = require("./helpers/errors")
+const { customResponse } = require("./helpers/response")
 
-
-module.exports.handler = async (event) => {
-  const dynamodb = new AWS.DynamoDB.DocumentClient();
+const deleteLink  = async (event) => {
   const { email } = event.requestContext.authorizer.lambda
   try {
-    const { id } = event.pathParameters;
+    const { id } = event.pathParameters
+    const key = { id : id }
+    const result = await getFromDb("ShortLinksTable", key)
+    const { Item } = result
 
-    const params = {
-      TableName: "ShortLinksTable",
-      Key: { id },
-    };
-    const result = await dynamodb.get(params).promise();
-    const { Item } = result;
-
-    if (Item && (Item.email == email)) {
-      await dynamodb.delete(params).promise();
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ message: `Item with id ${id} deleted` }),
-      };
+    if (Item && Item.email == email) {
+      await deleteFromDb("ShortLinksTable", key)
+      return customResponse(200, { message: `Item with id ${id} deleted` })
     }
 
-    return {
-      statusCode: 404,
-      body: JSON.stringify({ message: 'provided Id not found' }),
-    };
+    return customError(404, { message: "provided Id not found" })
   } catch (error) {
-    console.error(error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: 'Internal Server Error' }),
-    };
+    console.error(error)
+    return defaultError()
   }
-};
+}
+
+module.exports = {
+  handler: deleteLink,
+}

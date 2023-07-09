@@ -1,67 +1,42 @@
-const jwt = require("jsonwebtoken")
-const AWS = require('aws-sdk');
+const { updateIteminDb, getFromDb } = require("./database/dbHelpers.js")
+const { decodeRefreshToken, generateJwtToken, generateRefreshToken } = require("./helpers/jwtHelper.js")
+const { customResponse } = require("./helpers/response.js")
+const { customError } = require("./helpers/errors.js")
 
-module.exports.handler = async (event) => {
-  const dynamodb = new AWS.DynamoDB.DocumentClient()
+const refreshTokens = async (event) => {
   let user
   try {
     const { refreshToken } = JSON.parse(event.body)
-    const decoded = jwt.verify(refreshToken, "refresh-secret-key")
-    const result = await dynamodb
-      .get({
-        TableName: "UserTableTokens",
-        Key: { userEmail: decoded.username },
-      })
-      .promise()
+    const decoded = decodeRefreshToken(refreshToken)
+    const result = await getFromDb("UserTableTokens", {
+      userEmail: decoded.username,
+    })
     user = result.Item
 
     if (user.refreshToken !== refreshToken) {
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: "invalid refresh token" }),
-      }
+      return customError(500, "invalid refresh token")
     }
-    const newRefreshToken = jwt.sign(
-      { username: decoded.username },
-      "refresh-secret-key",
-      {
-        expiresIn: "7d",
-      }
-    )
-    const newAccessToken = jwt.sign(
-      { username: decoded.username },
-      "secret-key",
-      {
-        expiresIn: "1m",
-      }
-    )
+    const newRefreshToken = generateRefreshToken(user)
+    const newAccessToken = generateJwtToken(user)
 
-    const updateParams = {
-      TableName: "UserTableTokens",
-      Key: {
-        userEmail: decoded.username,
-      },
-      UpdateExpression: "SET refreshToken = :refreshToken",
-      ExpressionAttributeValues: {
+    await updateIteminDb(
+      "UserTableTokens",
+      { userEmail: decoded.username },
+      "SET refreshToken = :refreshToken",
+      {
         ":refreshToken": newRefreshToken,
-      },
-    }
-
-    await dynamodb.update(updateParams).promise()
+      }
+    )
     console.log("Refresh token updated")
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        accessToken: newAccessToken,
-        refreshToken: newRefreshToken,
-      }),
-    }
+    return customResponse(200, {
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+    })
   } catch (error) {
     console.log(error)
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: "An error occurred during token refresh" }),
-    }
+    return customError(500,{ error: "An error occurred during token refresh" } )
   }
 }
-
+module.exports = {
+  handler: refreshTokens,
+}

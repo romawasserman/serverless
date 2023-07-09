@@ -1,13 +1,13 @@
-const jwt = require('jsonwebtoken');
+const { generatePolicy } = require('./helpers/authPolicy');
+const { decodeAccessToken } = require('./helpers/jwtHelper');
 
-module.exports.handler = async (event) => {
+const tokenValidation = async (event) => {
   try {
     const token = event.headers['accesstoken'];
     if (!token) {
       throw new Error('Unauthorized');
     }
-    const decodedToken = jwt.verify(token, 'secret-key');
-    console.log('all is good ')
+    const decodedToken = decodeAccessToken(token)
     return generatePolicy(decodedToken.username, 'Allow', event.routeArn);
   } catch (error) {
     console.log(error);
@@ -15,24 +15,6 @@ module.exports.handler = async (event) => {
   }
 };
 
-const generatePolicy = (principalId, effect, resource) => {
-  const authResponse = {
-    principalId: principalId || 'user',
-    policyDocument: {
-      Version: '2012-10-17',
-      Statement: [
-        {
-          Action: 'execute-api:Invoke',
-          Effect: effect,
-          Resource: resource,
-        },
-      ],
-    },
-    "context": {
-      'email': principalId
-    }
-  };
-  console.log('Policy Document:');
-  console.dir(authResponse.policyDocument, { depth: null });
-  return authResponse;
-};
+module.exports = {
+  handler: tokenValidation,
+}

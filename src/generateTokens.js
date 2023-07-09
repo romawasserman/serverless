@@ -1,91 +1,74 @@
-const jwt = require("jsonwebtoken");
-const AWS = require('aws-sdk');
+const {
+  getFromDb,
+  putItemtoDb,
+  updateIteminDb,
+} = require("./database/dbHelpers.js")
+const { customResponse } = require("./helpers/response.js")
+const { defaultError, customError } = require("./helpers/errors.js")
+const {
+  generateJwtToken,
+  generateRefreshToken,
+} = require("./helpers/jwtHelper.js")
+const bcrypt = require('bcryptjs')
 
-const generateJwtToken = (user) => {
-  const token = jwt.sign({ username: user.userEmail }, "secret-key", {
-    expiresIn: "1d",
-  });
-  return token;
-};
-
-const generateRefreshToken = (user) => {
-  const refreshToken = jwt.sign(
-    { username: user.userEmail },
-    "refresh-secret-key",
-    {
-      expiresIn: "7d",
-    }
-  );
-  return refreshToken;
-};
-
-module.exports.handler = async (event) => {
-  const dynamodb = new AWS.DynamoDB.DocumentClient();
+const generateTokens = async (event) => {
   let user;
-
   try {
-    const { userEmail, password } = JSON.parse(event.body);
+    const { userEmail, password } = JSON.parse(event.body)
+    const key = {'userEmail' : userEmail}
 
-    const result = await dynamodb
-      .get({
-        TableName: "UserTable",
-        Key: { userEmail: userEmail },
-      })
-      .promise();
-
+    const result = await getFromDb("UserTable", key)
     user = result.Item;
 
-    if (!user || user.password !== password) {
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: "Invalid email or password" }),
-      };
+    const passwordMatch = await bcrypt.compare(password, user.password)
+
+    if (!user || !passwordMatch) {
+      return customError(500, "Invalid password or username")
     }
 
-    const jwtToken = generateJwtToken(user);
-    const refreshToken = generateRefreshToken(user);
+    const jwtToken = generateJwtToken(user)
+    const refreshToken = generateRefreshToken(user)
 
     const newUser = {
       userEmail,
       refreshToken,
-    };
-
-    const params = {
-      TableName: 'UserTableTokens',
-      Item: newUser,
-      ConditionExpression: 'attribute_not_exists(userEmail)',
-    };
+    }
 
     try {
-      await dynamodb.put(params).promise();
-      console.log('User added to database');
-    } catch (error) {
-      if (error.code === 'ConditionalCheckFailedException') {
-        const updateParams = {
-          TableName: 'UserTableTokens',
-          Key: {
-            userEmail,
-          },
-          UpdateExpression: 'SET refreshToken = :refreshToken',
-          ExpressionAttributeValues: {
-            ':refreshToken': refreshToken,
-          },
-        };
+      console.log(11);
+      await putItemtoDb(
+        "UserTableTokens",
+        newUser,
+        "attribute_not_exists(userEmail)"
+      )
 
-        await dynamodb.update(updateParams).promise();
-        console.log('Refresh token updated');
+      console.log("User added to database")
+    } catch (error) {
+      if (error.code === "ConditionalCheckFailedException") {  
+        console.log(22); // Is it ok? 
+        await updateIteminDb(
+          "UserTableTokens",
+          key,
+          "SET refreshToken = :refreshToken",
+          { ":refreshToken": refreshToken }
+        )
+        console.log("Refresh token updated")
+      } else {
+        console.log(error);
+        throw error
       }
     }
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ token: jwtToken, refreshToken }),
-    };
+    return customResponse(200, { token: jwtToken, refreshToken })
   } catch (error) {
-    console.error('Error:', error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: "Internal server error" }),
-    };
+    console.error("Error:", error)
+    return defaultError()
   }
-};
+}
+
+
+module.exports = {
+  handler: generateTokens,
+}
+
+

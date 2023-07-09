@@ -1,8 +1,10 @@
 service: serverless
 frameworkVersion: "3"
+useDotenv: true
 
 provider:
   name: aws
+  region: us-east-1
   runtime: nodejs18.x
   httpApi:
     authorizers:
@@ -11,6 +13,8 @@ provider:
         functionName: verifyToken
   iam:
     role:
+      managedPolicies:
+        - arn:aws:iam::aws:policy/AmazonEventBridgeSchedulerFullAccess
       statements:
         - Effect: Allow
           Action:
@@ -18,14 +22,13 @@ provider:
             - "events:*"
             - "ses:*"
             - "dynamodb:*"
+            - "lambda:*"
+            - "sts:*"
           Resource: "*"
 
 functions:
   eventBridgeCheck:
     handler: src/eventBridgeCheck.handler
-    events:
-      - eventBridge:
-          schedule: rate(10 minutes)
     environment:
       QUEUE_URL: ${construct:jobs.queueUrl}
   getAllUserLinks:
@@ -86,7 +89,7 @@ constructs:
     jobs:
         type: queue
         worker:
-            handler: src/worker.handler
+            handler: src/sesSender.handler
         batchSize: 10
 
 resources:
@@ -124,6 +127,52 @@ resources:
         KeySchema:
           - AttributeName: id
             KeyType: HASH
+    EventBridgeRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: scheduler-role
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - scheduler.amazonaws.com
+                  - events.amazonaws.com
+                  - lambda.amazonaws.com
+              Action:
+                - sts:AssumeRole
+        Policies:
+          - PolicyName: LambdaInvokeAccess
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - lambda:InvokeFunction
+                  Resource:
+                    "*"
+    EventBridgeRule:
+      Type: AWS::Events::Rule
+      Properties:
+        EventPattern:
+          source:
+            - "deleteLink"
+          detail-type:
+            - "linkDeleter"
+        Targets:
+          - Arn: arn:aws:lambda:${self:provider.region}:${env:AWS_ID}:function:serverless-dev-eventBridgeCheck
+            Id : EventBridge   
+
+custom:
+  scripts:
+    hooks:
+      "after:deploy:finalize": node verifyEmail.js
+
+    
 
 plugins:
+  - serverless-auto-swagger
   - serverless-lift
+  - serverless-dotenv-plugin
+  - serverless-esbuild

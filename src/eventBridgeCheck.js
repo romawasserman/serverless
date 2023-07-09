@@ -1,46 +1,22 @@
-const AWS = require('aws-sdk');
-
-module.exports.handler = async (event, context) => {
-  const dynamodb = new AWS.DynamoDB.DocumentClient();
-  const sqs = new AWS.SQS();
+const { deleteFromDb } = require("./database/dbHelpers")
+const { defaultError } = require("./helpers/errors")
+const { sendSQSMessage } = require("./helpers/sqsHelper")
+const sendMessage = async (event) => {
+  const { shortLink, shortId } = event
 
   try {
-    const scanParams = {
-      TableName: 'ShortLinksTable',
-    };
-    const scanResult = await dynamodb.scan(scanParams).promise();
-    const items = scanResult.Items;
-
-    for (const item of items) {
-      if (Date.now() / 1000 > item.expirationTime) {
-        const deleteParams = {
-          TableName: 'ShortLinksTable',
-          Key: { id: item.id },
-        };
-
-        await sqs
-          .sendMessage({
-            QueueUrl: process.env.QUEUE_URL,
-            MessageBody: JSON.stringify({
-              email: item.email,
-              msg: `Your link ${item.id}, that refers to ${item.originalUrl} is deleted`,
-              subject: 'Link deactivation',
-            }),
-          })
-          .promise();
-
-        await dynamodb.delete(deleteParams).promise();
-      }
-    }
+    await sendSQSMessage(process.env.QUEUE_URL, shortLink, event)
+    await deleteFromDb("ShortLinksTable", { id: shortId })
 
     return {
       statusCode: 200,
-    };
+    }
   } catch (error) {
-    console.error(error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: 'Internal Server Error' }),
-    };
+    console.error(error)
+    return defaultError()
   }
-};
+}
+
+module.exports = {
+  handler: sendMessage,
+}
